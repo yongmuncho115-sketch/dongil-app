@@ -1,60 +1,40 @@
 {% extends 'base.html' %}
+{% block title %}발주목록 - 동일산업{% endblock %}
 {% block content %}
-<h5 class="mb-3">📊 대시보드</h5>
-<div class="row g-3 mb-4">
-  <div class="col-6 col-md-3">
-    <div class="card text-center border-primary">
-      <div class="card-body">
-        <div class="fs-2 fw-bold text-primary">{{ total }}</div>
-        <div class="text-muted small">전체</div>
-      </div>
-    </div>
+<div class="card">
+  <div class="page-title">📋 제조의뢰서 목록</div>
+  <div class="btn-group">
+    <a href="{{ url_for('new_order') }}" class="btn btn-primary">＋ 신규 제조의뢰서 등록</a>
+    <a href="{{ url_for('doc_numbers') }}" class="btn btn-info">🔢 신규 문서번호 등록</a>
+    {% if session.role == 'admin' %}<a href="{{ url_for('users') }}" class="btn btn-secondary">👥 사용자 관리</a>{% endif %}
   </div>
-  <div class="col-6 col-md-3">
-    <div class="card text-center border-warning">
-      <div class="card-body">
-        <div class="fs-2 fw-bold text-warning">{{ pending }}</div>
-        <div class="text-muted small">미출고</div>
-      </div>
-    </div>
-  </div>
-  <div class="col-6 col-md-3">
-    <div class="card text-center border-success">
-      <div class="card-body">
-        <div class="fs-2 fw-bold text-success">{{ done }}</div>
-        <div class="text-muted small">출고완료</div>
-      </div>
-    </div>
-  </div>
-  <div class="col-6 col-md-3">
-    <div class="card text-center border-danger">
-      <div class="card-body">
-        <div class="fs-2 fw-bold text-danger">{{ urgent }}</div>
-        <div class="text-muted small">납기초과</div>
-      </div>
-    </div>
-  </div>
-</div>
-<div class="d-flex justify-content-between align-items-center mb-2">
-  <h6 class="mb-0">최근 등록</h6>
-  <a href="/orders/new" class="btn btn-primary btn-sm">+ 신규 등록</a>
-</div>
-<div class="table-responsive">
-<table class="table table-sm table-hover bg-white">
-  <thead class="table-dark"><tr>
-    <th>문서번호</th><th>거래처</th><th>상품명</th><th>납기</th><th>상태</th>
-  </tr></thead>
-  <tbody>
-  {% for r in recent %}
-  <tr>
-    <td><a href="/orders/{{ r.id }}/edit">{{ r.문서번호 }}</a></td>
-    <td>{{ r.거래처 }}</td>
-    <td>{{ r.상품명 }}</td>
-    <td>{{ r.납기 }}</td>
-    <td>{% if r.출고여부 %}<span class="badge bg-success">출고</span>{% else %}<span class="badge bg-warning text-dark">대기</span>{% endif %}</td>
-  </tr>
-  {% endfor %}
-  </tbody>
-</table>
+  <table>
+    <thead>
+      <tr><th>No</th><th>의뢰서번호</th><th>문서번호</th><th>제목</th><th>작성자</th><th>작성일</th><th>상태</th><th>관리</th></tr>
+    </thead>
+    <tbody>
+      {% for o in orders %}
+      <tr>
+        <td>{{ loop.index }}</td>
+        <td><strong>{{ o.order_no }}</strong></td>
+        <td>{{ o.doc_no or '-' }}</td>
+        <td style="text-align:left">{{ o.title or '-' }}</td>
+        <td>{{ o.writer }}</td>
+        <td>{{ o.write_date or o.created_at[:10] }}</td>
+        <td><span class="badge badge-active">{{ o.status }}</span></td>
+        <td>
+          <a href="{{ url_for('view_order', oid=o.id) }}" class="btn btn-info btn-sm">조회</a>
+          <a href="{{ url_for('edit_order', oid=o.id) }}" class="btn btn-warning btn-sm">수정</a>
+          <a href="{{ url_for('print_order', oid=o.id) }}" class="btn btn-print btn-sm" target="_blank">인쇄</a>
+          <form method="post" action="{{ url_for('delete_order', oid=o.id) }}" style="display:inline" onsubmit="return confirm('삭제하시겠습니까?')">
+            <button type="submit" class="btn btn-danger btn-sm">삭제</button>
+          </form>
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="8" style="color:#999;padding:30px">등록된 제조의뢰서가 없습니다.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
 </div>
 {% endblock %}

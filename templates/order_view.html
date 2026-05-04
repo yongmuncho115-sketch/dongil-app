@@ -1,0 +1,78 @@
+{% extends 'base.html' %}
+{% block title %}제조의뢰서 조회 - 동일산업{% endblock %}
+{% block content %}
+<div class="card">
+  <div class="page-title">📄 제조의뢰서 조회</div>
+
+  <div class="btn-group">
+    <a href="{{ url_for('index') }}" class="btn btn-secondary">← 목록으로</a>
+    <a href="{{ url_for('edit_order', oid=order.id) }}" class="btn btn-warning">✏️ 수정</a>
+    <a href="{{ url_for('print_order', oid=order.id) }}" class="btn btn-print" target="_blank">🖨 인쇄</a>
+    <form method="post" action="{{ url_for('delete_order', oid=order.id) }}"
+          style="display:inline" onsubmit="return confirm('삭제하시겠습니까?')">
+      <button type="submit" class="btn btn-danger">삭제</button>
+    </form>
+  </div>
+
+  <!-- 헤더 정보 -->
+  <div style="border:2px solid #1a3a6b;border-radius:8px;overflow:hidden;margin-bottom:20px;">
+    <div style="background:#1a3a6b;color:#fff;text-align:center;padding:14px;font-size:20px;font-weight:700;letter-spacing:4px;">
+      제 조 의 뢰 서
+    </div>
+    <div style="display:grid;grid-template-columns:1fr auto;border-top:1px solid #ddd;">
+      <div style="padding:16px;display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+        <div><span style="color:#888;font-size:13px;">제조의뢰서번호</span>
+             <div style="font-weight:700;font-size:15px;color:#1a3a6b;">{{ order.order_no }}</div></div>
+        <div><span style="color:#888;font-size:13px;">문서번호</span>
+             <div style="font-weight:700;">{{ order.doc_no or '-' }}</div></div>
+        <div><span style="color:#888;font-size:13px;">작성일</span>
+             <div>{{ order.write_date or '-' }}</div></div>
+        <div><span style="color:#888;font-size:13px;">작성자</span>
+             <div>{{ order.writer }}</div></div>
+        {% if order.title %}
+        <div style="grid-column:1/-1;"><span style="color:#888;font-size:13px;">제목</span>
+             <div>{{ order.title }}</div></div>
+        {% endif %}
+      </div>
+      <!-- 결재란 -->
+      <div style="border-left:1px solid #ddd;display:grid;grid-template-columns:repeat(3,90px);">
+        {% for label, val in [('작성자', order.approver1), ('결재요청자', order.approver2), ('관리총괄', order.approver3)] %}
+        <div style="border-right:1px solid #ddd;text-align:center;padding:8px 4px;{% if loop.last %}border-right:none;{% endif %}">
+          <div style="font-size:12px;color:#888;border-bottom:1px solid #eee;padding-bottom:4px;margin-bottom:4px;">{{ label }}</div>
+          <div style="min-height:40px;font-size:13px;padding-top:4px;">{{ val or '' }}</div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+
+  <!-- 세부발주 테이블 -->
+  <div style="font-weight:700;color:#1a3a6b;margin-bottom:10px;font-size:15px;">세부 발주 항목</div>
+  <div style="overflow-x:auto;">
+    <table>
+      <thead>
+        <tr>
+          <th>No</th><th>거래처</th><th>상품명</th><th>수량</th><th>단위</th>
+          <th>재질 및 규격</th><th>납기일</th><th>비고</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in items %}
+        <tr>
+          <td>{{ loop.index }}</td>
+          <td>{{ item.customer or '-' }}</td>
+          <td style="text-align:left;font-weight:600;">{{ item.product_name }}</td>
+          <td>{{ item.quantity or '-' }}</td>
+          <td>{{ item.unit or '-' }}</td>
+          <td style="text-align:left;">{{ item.material_spec or '-' }}</td>
+          <td>{{ item.delivery_date or '-' }}</td>
+          <td style="text-align:left;">{{ item.note or '-' }}</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="8" style="color:#999;padding:20px">세부 항목이 없습니다.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

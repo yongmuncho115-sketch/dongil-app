@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>제조의뢰서 {{ order.order_no }}</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Malgun Gothic', sans-serif; padding: 20px; background: #fff; }
+  .print-btn {
+    background: #1a3a6b; color: #fff; border: none; padding: 8px 20px;
+    border-radius: 5px; cursor: pointer; font-size: 14px; margin-bottom: 16px;
+    margin-right: 8px;
+  }
+  .no-print { margin-bottom: 16px; }
+  @media print { .no-print { display: none; } body { padding: 0; } }
+
+  .doc-title {
+    text-align: center; font-size: 28px; font-weight: 700; letter-spacing: 10px;
+    padding: 16px; border: 2px solid #000; margin-bottom: 0;
+  }
+  .header-table { width: 100%; border-collapse: collapse; border: 1px solid #000; }
+  .header-table td { padding: 8px 10px; border: 1px solid #000; font-size: 13px; }
+  .header-table .label { background: #f5f5f5; font-weight: 700; width: 120px; }
+  .approval-table { border-collapse: collapse; }
+  .approval-table td { border: 1px solid #000; padding: 6px 12px; text-align: center;
+                        font-size: 12px; min-width: 80px; min-height: 50px; }
+  .approval-table .alabel { background: #f5f5f5; font-weight: 700; font-size: 11px; }
+
+  .items-title { font-size: 15px; font-weight: 700; margin: 14px 0 6px; }
+  .items-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .items-table th { background: #1a3a6b; color: #fff; padding: 8px; text-align: center;
+                    border: 1px solid #000; }
+  .items-table td { padding: 7px 8px; border: 1px solid #000; text-align: center; }
+</style>
+</head>
+<body>
+
+<div class="no-print">
+  <button class="print-btn" onclick="window.print()">🖨 인쇄</button>
+  <button class="print-btn" style="background:#7f8c8d;" onclick="history.back()">← 돌아가기</button>
+</div>
+
+<div class="doc-title">제 조 의 뢰 서</div>
+
+<!-- 헤더 -->
+<table class="header-table">
+  <tr>
+    <td class="label">제조의뢰서번호</td>
+    <td colspan="3"><strong>{{ order.order_no }}</strong></td>
+    <td rowspan="3" style="padding:0;">
+      <table class="approval-table" style="width:100%;height:100%;">
+        <tr>
+          <td class="alabel">작성자</td>
+          <td class="alabel">결재요청자</td>
+          <td class="alabel">관리총괄</td>
+        </tr>
+        <tr>
+          <td style="height:50px;">{{ order.approver1 or '' }}</td>
+          <td style="height:50px;">{{ order.approver2 or '' }}</td>
+          <td style="height:50px;">{{ order.approver3 or '' }}</td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+  <tr>
+    <td class="label">문서번호</td>
+    <td>{{ order.doc_no or '' }}</td>
+    <td class="label">작성일</td>
+    <td>{{ order.write_date or '' }}</td>
+  </tr>
+  <tr>
+    <td class="label">작성자</td>
+    <td colspan="3">{{ order.writer }}</td>
+  </tr>
+  {% if order.title %}
+  <tr>
+    <td class="label">제목</td>
+    <td colspan="4">{{ order.title }}</td>
+  </tr>
+  {% endif %}
+</table>
+
+<!-- 세부발주 -->
+<div class="items-title">세부 발주 항목</div>
+<table class="items-table">
+  <thead>
+    <tr>
+      <th>No</th><th>거래처</th><th>상품명</th><th>수량</th><th>단위</th>
+      <th>재질 및 규격</th><th>납기일</th><th>비고</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for item in items %}
+    <tr>
+      <td>{{ loop.index }}</td>
+      <td>{{ item.customer or '' }}</td>
+      <td style="text-align:left;">{{ item.product_name }}</td>
+      <td>{{ item.quantity or '' }}</td>
+      <td>{{ item.unit or '' }}</td>
+      <td style="text-align:left;">{{ item.material_spec or '' }}</td>
+      <td>{{ item.delivery_date or '' }}</td>
+      <td style="text-align:left;">{{ item.note or '' }}</td>
+    </tr>
+    {% else %}
+    <tr><td colspan="8" style="padding:20px;color:#999;">-</td></tr>
+    {% endfor %}
+    <!-- 빈 줄 (인쇄용) -->
+    {% for i in range([10 - items|length, 0]|max) %}
+    <tr>
+      <td>{{ items|length + loop.index }}</td>
+      <td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td>
+      <td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+</body>
+</html>

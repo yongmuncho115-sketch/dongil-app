@@ -1,59 +1,239 @@
 {% extends 'base.html' %}
+{% block title %}{% if mode=='new' %}신규 제조의뢰서{% else %}제조의뢰서 수정{% endif %} - 동일산업{% endblock %}
+{% block extra_head %}
+<style>
+  .form-section { margin-bottom: 24px; }
+  .form-section-title {
+    font-size: 15px; font-weight: 700; color: #1a3a6b;
+    border-left: 4px solid #1a3a6b; padding-left: 10px;
+    margin-bottom: 14px;
+  }
+  .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px,1fr)); gap: 14px; }
+  .form-group label { display: block; font-size: 13px; font-weight: 600; color: #555; margin-bottom: 4px; }
+  .form-group input, .form-group select, .form-group textarea {
+    width: 100%; padding: 8px 10px; border: 1px solid #ddd;
+    border-radius: 5px; font-size: 14px; font-family: inherit;
+  }
+  .form-group input:focus, .form-group select:focus {
+    border-color: #1a3a6b; outline: none;
+    box-shadow: 0 0 0 2px rgba(26,58,107,0.1);
+  }
+  /* 결재란 */
+  .approval-box {
+    display: grid; grid-template-columns: repeat(3,1fr);
+    border: 1px solid #ddd; border-radius: 6px; overflow: hidden;
+    margin-top: 4px;
+  }
+  .approval-cell { padding: 10px; border-right: 1px solid #ddd; text-align: center; }
+  .approval-cell:last-child { border-right: none; }
+  .approval-cell label { font-size: 12px; color: #888; margin-bottom: 6px; }
+  .approval-cell input { border: none; border-bottom: 1px solid #ddd; border-radius: 0;
+                          text-align: center; font-size: 13px; padding: 4px; }
+
+  /* 세부발주 테이블 */
+  .items-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .items-table th {
+    background: #1a3a6b; color: #fff; padding: 8px; text-align: center;
+    font-weight: 600; white-space: nowrap;
+  }
+  .items-table td { padding: 4px; border: 1px solid #e0e0e0; }
+  .items-table input {
+    width: 100%; padding: 6px 8px; border: 1px solid #ddd;
+    border-radius: 3px; font-size: 13px; font-family: inherit;
+  }
+  .items-table input:focus { border-color: #1a3a6b; outline: none; }
+  .seq-cell { background: #f5f7fa; text-align: center; font-weight: 600;
+              color: #666; width: 36px; }
+  .del-btn { background: #c0392b; color: #fff; border: none; border-radius: 4px;
+             padding: 4px 8px; cursor: pointer; font-size: 12px; }
+  .add-row-btn {
+    margin-top: 10px; background: #27ae60; color: #fff;
+    border: none; border-radius: 5px; padding: 8px 16px;
+    font-size: 14px; cursor: pointer; font-weight: 600;
+  }
+  .add-row-btn:hover { background: #1e8449; }
+</style>
+{% endblock %}
+
 {% block content %}
-<h5>✏️ 제조의뢰서 수정 — {{ doc_no }}</h5>
-<form method="post">
-<div class="card mb-3"><div class="card-body">
-  <div class="row g-2">
-    <div class="col-md-3">
-      <label class="form-label small">문서번호</label>
-      <input type="text" name="문서번호" class="form-control form-control-sm" value="{{ doc_no }}" readonly>
-    </div>
-    <div class="col-md-3">
-      <label class="form-label small">거래처</label>
-      <select name="거래처" class="form-select form-select-sm">
-        <option value="">-- 선택 --</option>
-        {% for c in 거래처목록 %}<option {% if order.거래처==c %}selected{% endif %}>{{ c }}</option>{% endfor %}
-      </select>
-    </div>
-    <div class="col-md-2">
-      <label class="form-label small">납기</label>
-      <input type="date" name="납기" class="form-control form-control-sm" value="{{ order.납기 or '' }}">
-    </div>
-    <div class="col-md-2">
-      <label class="form-label small">영업담당</label>
-      <select name="영업담당" class="form-select form-select-sm">
-        <option value="">-- 선택 --</option>
-        {% for s in 영업담당목록 %}<option {% if order.영업담당==s %}selected{% endif %}>{{ s }}</option>{% endfor %}
-      </select>
-    </div>
-    <div class="col-md-2">
-      <label class="form-label small">출고여부</label>
-      <div class="form-check mt-1">
-        <input type="checkbox" name="출고여부" class="form-check-input" {% if order.출고여부 %}checked{% endif %}>
-        <label class="form-check-label small">출고완료</label>
+<div class="card">
+  <div class="page-title">
+    {% if mode=='new' %}＋ 신규 제조의뢰서 등록{% else %}✏️ 제조의뢰서 수정{% endif %}
+  </div>
+
+  <!-- 상단 버튼 그룹 -->
+  <div class="btn-group">
+    <a href="{{ url_for('index') }}" class="btn btn-secondary">← 목록으로</a>
+    <a href="{{ url_for('doc_numbers') }}" class="btn btn-info">🔢 신규 문서번호 등록</a>
+    {% if order %}
+    <a href="{{ url_for('view_order', oid=order.id) }}" class="btn btn-success">👁 조회</a>
+    <a href="{{ url_for('print_order', oid=order.id) }}" class="btn btn-print">🖨 인쇄</a>
+    {% endif %}
+  </div>
+
+  <form method="post" action="{{ url_for('save_order') }}">
+    {% if order %}
+    <input type="hidden" name="order_id" value="{{ order.id }}">
+    {% endif %}
+
+    <!-- ① 기본 정보 -->
+    <div class="form-section">
+      <div class="form-section-title">기본 정보</div>
+      <div class="form-grid">
+        <div class="form-group">
+          <label>제조의뢰서 번호 *</label>
+          <input type="text" name="order_no" required
+                 value="{{ order.order_no if order else '' }}"
+                 placeholder="예) MR-2025-001">
+        </div>
+        <div class="form-group">
+          <label>문서번호</label>
+          <select name="doc_no_id">
+            <option value="">-- 선택 --</option>
+            {% for d in doc_numbers %}
+            <option value="{{ d.id }}"
+              {% if order and order.doc_no_id == d.id %}selected{% endif %}>
+              {{ d.doc_no }}{% if d.description %} ({{ d.description }}){% endif %}
+            </option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="form-group">
+          <label>제목</label>
+          <input type="text" name="title"
+                 value="{{ order.title if order else '' }}"
+                 placeholder="의뢰서 제목 (선택)">
+        </div>
+        <div class="form-group">
+          <label>작성일</label>
+          <input type="date" name="write_date"
+                 value="{{ order.write_date if order else today }}">
+        </div>
+        <div class="form-group">
+          <label>작성자</label>
+          <input type="text" name="writer"
+                 value="{{ order.writer if order else session.name }}">
+        </div>
       </div>
     </div>
-  </div>
-</div></div>
 
-<div class="card mb-3"><div class="card-body">
-<div class="row g-2">
-  {% for field, label in [('상품명','상품명'),('수량','수량'),('단위','단위'),('재질1','재질1'),('두께1','두께1'),('폭1','폭1'),('재질2','재질2'),('두께2','두께2'),('폭2','폭2'),('상품폭','상품폭'),('비중','비중'),('길이','길이'),('피치','피치'),('Cut수','Cut수'),('방향','방향'),('인쇄도수','인쇄도수'),('PE투입','PE투입'),('동판둘레','동판둘레'),('동판폭','동판폭'),('포장방법','포장방법'),('폼텍갯수','폼텍갯수'),('일매','일매'),('적요','적요'),('후도','후도'),('캡','캡'),('밑지','밑지'),('이차여부','이차여부'),('이차가공','이차가공'),('실링','실링'),('개구부','개구부'),('방향2','방향2')] %}
-  <div class="col-6 col-md-2">
-    <label class="form-label small">{{ label }}</label>
-    <input type="text" name="{{ field }}" class="form-control form-control-sm" value="{{ order[field] or '' }}">
-  </div>
-  {% endfor %}
-  <div class="col-md-4">
-    <label class="form-label small">비고</label>
-    <input type="text" name="비고" class="form-control form-control-sm" value="{{ order.비고 or '' }}">
-  </div>
-</div>
-</div></div>
+    <!-- ② 결재란 -->
+    <div class="form-section">
+      <div class="form-section-title">결 재 란</div>
+      <div class="approval-box">
+        <div class="approval-cell">
+          <label>작성자</label>
+          <input type="text" name="approver1"
+                 value="{{ order.approver1 if order else '' }}" placeholder="서명">
+        </div>
+        <div class="approval-cell">
+          <label>결재요청자</label>
+          <input type="text" name="approver2"
+                 value="{{ order.approver2 if order else '' }}" placeholder="서명">
+        </div>
+        <div class="approval-cell">
+          <label>관리총괄</label>
+          <input type="text" name="approver3"
+                 value="{{ order.approver3 if order else '' }}" placeholder="서명">
+        </div>
+      </div>
+    </div>
 
-<div class="d-flex gap-2">
-  <button type="submit" class="btn btn-primary">저장</button>
-  <a href="/orders" class="btn btn-secondary">취소</a>
+    <!-- ③ 세부발주 항목 -->
+    <div class="form-section">
+      <div class="form-section-title">세부 발주 항목</div>
+      <div style="overflow-x:auto;">
+        <table class="items-table">
+          <thead>
+            <tr>
+              <th>No</th>
+              <th>거래처</th>
+              <th>상품명 *</th>
+              <th>수량</th>
+              <th>단위</th>
+              <th>재질 및 규격</th>
+              <th>납기일</th>
+              <th>비고</th>
+              <th>삭제</th>
+            </tr>
+          </thead>
+          <tbody id="itemsBody">
+            {% if items %}
+            {% for item in items %}
+            <tr>
+              <td class="seq-cell">{{ loop.index }}</td>
+              <td><input type="text" name="customer[]" value="{{ item.customer }}"></td>
+              <td><input type="text" name="product_name[]" value="{{ item.product_name }}" required></td>
+              <td><input type="number" name="quantity[]" value="{{ item.quantity }}" step="any" style="width:80px;"></td>
+              <td><input type="text" name="unit[]" value="{{ item.unit }}" style="width:60px;"></td>
+              <td><input type="text" name="material_spec[]" value="{{ item.material_spec }}"></td>
+              <td><input type="date" name="delivery_date[]" value="{{ item.delivery_date }}"></td>
+              <td><input type="text" name="note[]" value="{{ item.note }}"></td>
+              <td><button type="button" class="del-btn" onclick="delRow(this)">✕</button></td>
+            </tr>
+            {% endfor %}
+            {% else %}
+            <tr>
+              <td class="seq-cell">1</td>
+              <td><input type="text" name="customer[]"></td>
+              <td><input type="text" name="product_name[]"></td>
+              <td><input type="number" name="quantity[]" step="any" style="width:80px;"></td>
+              <td><input type="text" name="unit[]" style="width:60px;"></td>
+              <td><input type="text" name="material_spec[]"></td>
+              <td><input type="date" name="delivery_date[]"></td>
+              <td><input type="text" name="note[]"></td>
+              <td><button type="button" class="del-btn" onclick="delRow(this)">✕</button></td>
+            </tr>
+            {% endif %}
+          </tbody>
+        </table>
+      </div>
+      <button type="button" class="add-row-btn" onclick="addRow()">＋ 항목 추가</button>
+    </div>
+
+    <!-- 저장 버튼 -->
+    <div style="display:flex;gap:10px;justify-content:center;margin-top:10px;">
+      <button type="submit" class="btn btn-primary" style="padding:10px 40px;font-size:15px;">
+        💾 저장
+      </button>
+      <a href="{{ url_for('index') }}" class="btn btn-secondary" style="padding:10px 30px;font-size:15px;">
+        취소
+      </a>
+    </div>
+  </form>
 </div>
-</form>
+
+<script>
+function addRow() {
+  const tbody = document.getElementById('itemsBody');
+  const rowCount = tbody.querySelectorAll('tr').length + 1;
+  const tr = document.createElement('tr');
+  tr.innerHTML = `
+    <td class="seq-cell">${rowCount}</td>
+    <td><input type="text" name="customer[]"></td>
+    <td><input type="text" name="product_name[]"></td>
+    <td><input type="number" name="quantity[]" step="any" style="width:80px;"></td>
+    <td><input type="text" name="unit[]" style="width:60px;"></td>
+    <td><input type="text" name="material_spec[]"></td>
+    <td><input type="date" name="delivery_date[]"></td>
+    <td><input type="text" name="note[]"></td>
+    <td><button type="button" class="del-btn" onclick="delRow(this)">✕</button></td>
+  `;
+  tbody.appendChild(tr);
+  reindexRows();
+}
+
+function delRow(btn) {
+  const tbody = document.getElementById('itemsBody');
+  if (tbody.querySelectorAll('tr').length <= 1) { alert('최소 1개 항목이 필요합니다.'); return; }
+  btn.closest('tr').remove();
+  reindexRows();
+}
+
+function reindexRows() {
+  document.querySelectorAll('#itemsBody tr').forEach((tr, i) => {
+    tr.querySelector('.seq-cell').textContent = i + 1;
+  });
+}
+</script>
 {% endblock %}

@@ -1,117 +1,67 @@
-from flask import Flask, render_template, request, redirect, url_for, session, jsonify, flash
-import sqlite3, os, hashlib, json
-from datetime import datetime, date
+from flask import Flask, render_template, request, redirect, url_for, session, flash
+import sqlite3, os, hashlib
+from datetime import date
 from functools import wraps
 
 app = Flask(__name__)
-app.secret_key = 'dongil-secret-key-2025-change-this'
-
-DB_PATH = 'data/dongil.db'
+app.secret_key = 'dongil-secret-key-2025'
+DB_PATH = os.path.join(os.path.dirname(__file__), 'dongil.db')
 
 def get_db():
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     return conn
 
-def hash_pw(pw):
-    return hashlib.sha256(pw.encode()).hexdigest()
+def init_db():
+    conn = get_db()
+    c = conn.cursor()
+    c.execute("""CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT UNIQUE NOT NULL, password TEXT NOT NULL, name TEXT NOT NULL, role TEXT DEFAULT 'user', active INTEGER DEFAULT 1, created_at TEXT DEFAULT (datetime('now','localtime')))""")
+    c.execute("""CREATE TABLE IF NOT EXISTS doc_numbers (id INTEGER PRIMARY KEY AUTOINCREMENT, doc_no TEXT UNIQUE NOT NULL, description TEXT, created_by INTEGER, created_at TEXT DEFAULT (datetime('now','localtime')))""")
+    c.execute("""CREATE TABLE IF NOT EXISTS orders (id INTEGER PRIMARY KEY AUTOINCREMENT, order_no TEXT UNIQUE NOT NULL, doc_no_id INTEGER, title TEXT, writer TEXT, write_date TEXT, approver1 TEXT, approver2 TEXT, approver3 TEXT, status TEXT DEFAULT 'writing', created_by INTEGER, created_at TEXT DEFAULT (datetime('now','localtime')), FOREIGN KEY (doc_no_id) REFERENCES doc_numbers(id))""")
+    c.execute("""CREATE TABLE IF NOT EXISTS order_items (id INTEGER PRIMARY KEY AUTOINCREMENT, order_id INTEGER NOT NULL, seq INTEGER DEFAULT 1, customer TEXT, product_name TEXT, quantity REAL, unit TEXT, material_spec TEXT, delivery_date TEXT, note TEXT, FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE)""")
+    conn.commit()
+    existing = c.execute("SELECT id FROM users WHERE username='admin'").fetchone()
+    if not existing:
+        pw = hashlib.sha256('admin1234'.encode()).hexdigest()
+        c.execute("INSERT INTO users (username, password, name, role) VALUES (?,?,?,?)", ('admin', pw, '관리자', 'admin'))
+        conn.commit()
+    conn.close()
 
 def login_required(f):
     @wraps(f)
     def decorated(*args, **kwargs):
-        if 'user' not in session:
+        if 'user_id' not in session:
             return redirect(url_for('login'))
         return f(*args, **kwargs)
     return decorated
 
-def init_db():
-    os.makedirs('data', exist_ok=True)
-    conn = get_db()
-    c = conn.cursor()
-    c.executescript('''
-    CREATE TABLE IF NOT EXISTS users (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        username TEXT UNIQUE NOT NULL,
-        password TEXT NOT NULL,
-        name TEXT,
-        role TEXT DEFAULT 'user'
-    );
-    CREATE TABLE IF NOT EXISTS 거래처리스트 (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        거래처명 TEXT NOT NULL
-    );
-    CREATE TABLE IF NOT EXISTS 영업담당목록 (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        영업담당 TEXT NOT NULL
-    );
-    CREATE TABLE IF NOT EXISTS 상품목록 (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        상품등록번호 TEXT,
-        상품명 TEXT NOT NULL,
-        거래처 TEXT,
-        재질1 TEXT, 비중 REAL, 두께1 REAL, 폭1 REAL,
-        재질2 TEXT, 두께2 REAL, 폭2 REAL,
-        상품폭 REAL, 길이 REAL, 피치 REAL,
-        Cut수 REAL, 방향 TEXT, 인쇄도수 REAL,
-        PE투입 TEXT, 동판둘레 INTEGER, 동판폭 INTEGER,
-        포장방법 TEXT, 폼텍갯수 INTEGER, 영업담당 TEXT,
-        일매 TEXT, 적요 TEXT, 후도 TEXT, 캡 TEXT, 밑지 TEXT,
-        이차여부 TEXT, 이차가공 TEXT, 실링 TEXT, 개구부 TEXT,
-        방향2 TEXT, 동판위치 TEXT
-    );
-    CREATE TABLE IF NOT EXISTS 제조의뢰서 (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        문서번호 TEXT,
-        거래처 TEXT, 상품명 TEXT,
-        수량 REAL, 단위 TEXT, 납기 TEXT, 비고 TEXT,
-        재질1 TEXT, 두께1 REAL, 폭1 REAL,
-        재질2 TEXT, 두께2 REAL, 폭2 REAL,
-        상품폭 REAL, 비중 REAL, 길이 REAL, 피치 REAL,
-        Cut수 REAL, 방향 TEXT, 인쇄도수 REAL,
-        PE투입 TEXT, 동판둘레 INTEGER, 동판폭 INTEGER,
-        포장방법 TEXT, 폼텍갯수 INTEGER, 영업담당 TEXT,
-        출고일 TEXT, 출고여부 INTEGER DEFAULT 0,
-        일매 TEXT, 적요 TEXT, 후도 TEXT, 캡 TEXT, 밑지 TEXT,
-        이차여부 TEXT, 이차가공 TEXT, 실링 TEXT, 개구부 TEXT,
-        방향2 TEXT, 상품등록번호 TEXT,
-        작성일 TEXT DEFAULT (date('now')),
-        작성자 TEXT
-    );
-    ''')
-    try:
-        c.execute("INSERT INTO users (username, password, name, role) VALUES (?,?,?,?)",
-                  ('admin', hash_pw('admin1234'), '관리자', 'admin'))
-    except:
-        pass
-    conn.commit()
-    conn.close()
+def admin_required(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        if 'user_id' not in session:
+            return redirect(url_for('login'))
+        if session.get('role') != 'admin':
+            flash('관리자 권한이 필요합니다.', 'error')
+            return redirect(url_for('index'))
+        return f(*args, **kwargs)
+    return decorated
 
-def gen_doc_no():
-    today = datetime.now().strftime('%Y%m%d')
-    conn = get_db()
-    row = conn.execute(
-        "SELECT COUNT(*) as cnt FROM 제조의뢰서 WHERE 문서번호 LIKE ?",
-        (f'DI-{today}-%',)
-    ).fetchone()
-    conn.close()
-    seq = str(row['cnt'] + 1).zfill(3)
-    return f'DI-{today}-{seq}'
-
-@app.route('/login', methods=['GET', 'POST'])
+@app.route('/login', methods=['GET','POST'])
 def login():
     if request.method == 'POST':
-        username = request.form.get('username', '').strip()
-        password = request.form.get('password', '')
+        username = request.form.get('username','').strip()
+        password = request.form.get('password','').strip()
+        pw_hash = hashlib.sha256(password.encode()).hexdigest()
         conn = get_db()
-        user = conn.execute(
-            "SELECT * FROM users WHERE username=? AND password=?",
-            (username, hash_pw(password))
-        ).fetchone()
+        user = conn.execute("SELECT * FROM users WHERE username=? AND password=? AND active=1", (username, pw_hash)).fetchone()
         conn.close()
         if user:
-            session['user'] = dict(user)
+            session['user_id'] = user['id']
+            session['username'] = user['username']
+            session['name'] = user['name']
+            session['role'] = user['role']
             return redirect(url_for('index'))
-        flash('아이디 또는 비밀번호가 올바르지 않습니다.')
+        flash('아이디 또는 비밀번호가 올바르지 않습니다.', 'error')
     return render_template('login.html')
 
 @app.route('/logout')
@@ -123,217 +73,204 @@ def logout():
 @login_required
 def index():
     conn = get_db()
-    total = conn.execute("SELECT COUNT(*) as c FROM 제조의뢰서").fetchone()['c']
-    pending = conn.execute("SELECT COUNT(*) as c FROM 제조의뢰서 WHERE 출고여부=0").fetchone()['c']
-    done = conn.execute("SELECT COUNT(*) as c FROM 제조의뢰서 WHERE 출고여부=1").fetchone()['c']
-    today_str = date.today().isoformat()
-    urgent = conn.execute(
-        "SELECT COUNT(*) as c FROM 제조의뢰서 WHERE 출고여부=0 AND 납기<=?", (today_str,)
-    ).fetchone()['c']
-    recent = conn.execute("SELECT * FROM 제조의뢰서 ORDER BY id DESC LIMIT 10").fetchall()
+    orders = conn.execute('SELECT o.*, d.doc_no FROM orders o LEFT JOIN doc_numbers d ON o.doc_no_id = d.id ORDER BY o.created_at DESC').fetchall()
     conn.close()
-    return render_template('index.html', total=total, pending=pending,
-                           done=done, urgent=urgent, recent=recent)
+    return render_template('index.html', orders=orders)
 
-@app.route('/orders')
-@login_required
-def orders():
-    q = request.args.get('q', '')
-    status = request.args.get('status', '')
+@app.route('/users')
+@admin_required
+def users():
     conn = get_db()
-    sql = "SELECT * FROM 제조의뢰서 WHERE 1=1"
-    params = []
-    if q:
-        sql += " AND (거래처 LIKE ? OR 상품명 LIKE ? OR 문서번호 LIKE ?)"
-        params += [f'%{q}%', f'%{q}%', f'%{q}%']
-    if status == 'pending':
-        sql += " AND 출고여부=0"
-    elif status == 'done':
-        sql += " AND 출고여부=1"
-    sql += " ORDER BY id DESC"
-    rows = conn.execute(sql, params).fetchall()
-    conn.close()
-    return render_template('orders.html', rows=rows, q=q, status=status)
-
-@app.route('/orders/new', methods=['GET', 'POST'])
-@login_required
-def order_new():
-    conn = get_db()
-    거래처목록 = [r['거래처명'] for r in conn.execute("SELECT 거래처명 FROM 거래처리스트 ORDER BY 거래처명").fetchall()]
-    영업담당목록 = [r['영업담당'] for r in conn.execute("SELECT 영업담당 FROM 영업담당목록 ORDER BY 영업담당").fetchall()]
-
-    if request.method == 'POST':
-        data = request.form
-        doc_no = data.get('문서번호','').strip() or gen_doc_no()
-        공통 = {
-            '거래처': data.get('거래처','') or None,
-            '납기': data.get('납기','') or None,
-            '영업담당': data.get('영업담당','') or None,
-            '비고': data.get('비고','') or None,
-            '출고일': data.get('출고일','') or None,
-            '출고여부': 1 if data.get('출고여부') else 0,
-        }
-        행필드 = ['상품명','수량','단위','재질1','두께1','폭1','재질2','두께2','폭2',
-                  '상품폭','비중','길이','피치','Cut수','방향','인쇄도수',
-                  'PE투입','동판둘레','동판폭','포장방법','폼텍갯수',
-                  '일매','적요','후도','캡','밑지','이차여부','이차가공',
-                  '실링','개구부','방향2','상품등록번호']
-        상품명들 = data.getlist('상품명[]')
-        count = 0
-        for i in range(len(상품명들)):
-            if not 상품명들[i].strip():
-                continue
-            row = {f: (data.getlist(f+'[]')[i] if i < len(data.getlist(f+'[]')) else '') for f in 행필드}
-            all_fields = ['문서번호','거래처','납기','영업담당','비고','출고일','출고여부','작성자'] + 행필드
-            vals = [doc_no, 공통['거래처'], 공통['납기'], 공통['영업담당'], 공통['비고'],
-                    공통['출고일'], 공통['출고여부'], session['user']['name']]
-            vals += [row[f] or None for f in 행필드]
-            ph = ','.join(['?']*len(all_fields))
-            conn.execute(f"INSERT INTO 제조의뢰서 ({','.join(all_fields)}) VALUES ({ph})", vals)
-            count += 1
-        conn.commit()
-        conn.close()
-        flash(f'제조의뢰서 {doc_no} — {count}건 등록 완료!')
-        return redirect(url_for('orders'))
-
-    conn.close()
-    return render_template('order_form_multi.html', doc_no=gen_doc_no(),
-                           거래처목록=거래처목록, 영업담당목록=영업담당목록)
-
-@app.route('/orders/<int:oid>/edit', methods=['GET', 'POST'])
-@login_required
-def order_edit(oid):
-    conn = get_db()
-    order = conn.execute("SELECT * FROM 제조의뢰서 WHERE id=?", (oid,)).fetchone()
-    거래처목록 = [r['거래처명'] for r in conn.execute("SELECT 거래처명 FROM 거래처리스트 ORDER BY 거래처명").fetchall()]
-    영업담당목록 = [r['영업담당'] for r in conn.execute("SELECT 영업담당 FROM 영업담당목록 ORDER BY 영업담당").fetchall()]
-    상품목록 = conn.execute("SELECT * FROM 상품목록 ORDER BY 상품명").fetchall()
-
-    if request.method == 'POST':
-        data = request.form
-        fields = ['거래처','상품명','수량','단위','납기','비고',
-                  '재질1','두께1','폭1','재질2','두께2','폭2',
-                  '상품폭','비중','길이','피치','Cut수','방향','인쇄도수',
-                  'PE투입','동판둘레','동판폭','포장방법','폼텍갯수','영업담당',
-                  '출고일','일매','적요','후도','캡','밑지',
-                  '이차여부','이차가공','실링','개구부','방향2','상품등록번호']
-        set_str = ','.join([f'{f}=?' for f in fields])
-        출고여부 = 1 if data.get('출고여부') else 0
-        vals = [data.get(f,'') or None for f in fields]
-        conn.execute(
-            f"UPDATE 제조의뢰서 SET {set_str}, 출고여부=? WHERE id=?",
-            vals + [출고여부, oid]
-        )
-        conn.commit()
-        conn.close()
-        flash('수정 완료!')
-        return redirect(url_for('orders'))
-
-    conn.close()
-    return render_template('order_form.html', order=order, doc_no=order['문서번호'],
-                           거래처목록=거래처목록, 영업담당목록=영업담당목록, 상품목록=상품목록)
-
-@app.route('/orders/<int:oid>/delete', methods=['POST'])
-@login_required
-def order_delete(oid):
-    conn = get_db()
-    conn.execute("DELETE FROM 제조의뢰서 WHERE id=?", (oid,))
-    conn.commit()
-    conn.close()
-    flash('삭제 완료')
-    return redirect(url_for('orders'))
-
-@app.route('/api/product')
-@login_required
-def api_product():
-    name = request.args.get('name', '')
-    conn = get_db()
-    rows = conn.execute(
-        "SELECT * FROM 상품목록 WHERE 상품명 LIKE ? LIMIT 10", (f'%{name}%',)
-    ).fetchall()
-    conn.close()
-    return jsonify([dict(r) for r in rows])
-
-@app.route('/master/clients', methods=['GET','POST'])
-@login_required
-def master_clients():
-    conn = get_db()
-    if request.method == 'POST':
-        name = request.form.get('name','').strip()
-        if name:
-            try:
-                conn.execute("INSERT INTO 거래처리스트 (거래처명) VALUES (?)", (name,))
-                conn.commit()
-            except: pass
-    rows = conn.execute("SELECT * FROM 거래처리스트 ORDER BY 거래처명").fetchall()
-    conn.close()
-    return render_template('master.html', title='거래처 관리', rows=rows,
-                           col='거래처명', endpoint='master_clients')
-
-@app.route('/master/clients/<int:rid>/delete', methods=['POST'])
-@login_required
-def delete_client(rid):
-    conn = get_db()
-    conn.execute("DELETE FROM 거래처리스트 WHERE id=?", (rid,))
-    conn.commit(); conn.close()
-    return redirect(url_for('master_clients'))
-
-@app.route('/master/staff', methods=['GET','POST'])
-@login_required
-def master_staff():
-    conn = get_db()
-    if request.method == 'POST':
-        name = request.form.get('name','').strip()
-        if name:
-            conn.execute("INSERT INTO 영업담당목록 (영업담당) VALUES (?)", (name,))
-            conn.commit()
-    rows = conn.execute("SELECT * FROM 영업담당목록 ORDER BY 영업담당").fetchall()
-    conn.close()
-    return render_template('master.html', title='영업담당 관리', rows=rows,
-                           col='영업담당', endpoint='master_staff')
-
-@app.route('/master/staff/<int:rid>/delete', methods=['POST'])
-@login_required
-def delete_staff(rid):
-    conn = get_db()
-    conn.execute("DELETE FROM 영업담당목록 WHERE id=?", (rid,))
-    conn.commit(); conn.close()
-    return redirect(url_for('master_staff'))
-
-@app.route('/users', methods=['GET','POST'])
-@login_required
-def manage_users():
-    if session['user']['role'] != 'admin':
-        return redirect(url_for('index'))
-    conn = get_db()
-    if request.method == 'POST':
-        uname = request.form.get('username','').strip()
-        pw = request.form.get('password','')
-        name = request.form.get('name','').strip()
-        role = request.form.get('role','user')
-        try:
-            conn.execute("INSERT INTO users (username,password,name,role) VALUES (?,?,?,?)",
-                         (uname, hash_pw(pw), name, role))
-            conn.commit()
-            flash(f'사용자 {uname} 추가 완료')
-        except:
-            flash('이미 존재하는 아이디입니다.')
-    users = conn.execute("SELECT * FROM users").fetchall()
+    users = conn.execute("SELECT * FROM users ORDER BY id").fetchall()
     conn.close()
     return render_template('users.html', users=users)
 
-@app.route('/users/<int:uid>/delete', methods=['POST'])
-@login_required
+@app.route('/users/add', methods=['POST'])
+@admin_required
+def add_user():
+    conn = get_db()
+    cnt = conn.execute("SELECT COUNT(*) FROM users WHERE active=1").fetchone()[0]
+    if cnt >= 10:
+        flash('사용자는 최대 10명까지 등록 가능합니다.', 'error')
+        conn.close()
+        return redirect(url_for('users'))
+    username = request.form.get('username','').strip()
+    password = request.form.get('password','').strip()
+    name = request.form.get('name','').strip()
+    role = request.form.get('role','user')
+    if not username or not password or not name:
+        flash('모든 필드를 입력하세요.', 'error')
+        conn.close()
+        return redirect(url_for('users'))
+    if conn.execute("SELECT id FROM users WHERE username=?", (username,)).fetchone():
+        flash('이미 존재하는 아이디입니다.', 'error')
+        conn.close()
+        return redirect(url_for('users'))
+    pw_hash = hashlib.sha256(password.encode()).hexdigest()
+    conn.execute("INSERT INTO users (username, password, name, role) VALUES (?,?,?,?)", (username, pw_hash, name, role))
+    conn.commit()
+    conn.close()
+    flash(f'사용자 [{name}]이 등록되었습니다.', 'success')
+    return redirect(url_for('users'))
+
+@app.route('/users/edit/<int:uid>', methods=['POST'])
+@admin_required
+def edit_user(uid):
+    conn = get_db()
+    name = request.form.get('name','').strip()
+    role = request.form.get('role','user')
+    active = 1 if request.form.get('active') else 0
+    password = request.form.get('password','').strip()
+    if password:
+        pw_hash = hashlib.sha256(password.encode()).hexdigest()
+        conn.execute("UPDATE users SET name=?, role=?, active=?, password=? WHERE id=?", (name, role, active, pw_hash, uid))
+    else:
+        conn.execute("UPDATE users SET name=?, role=?, active=? WHERE id=?", (name, role, active, uid))
+    conn.commit()
+    conn.close()
+    flash('사용자 정보가 수정되었습니다.', 'success')
+    return redirect(url_for('users'))
+
+@app.route('/users/delete/<int:uid>', methods=['POST'])
+@admin_required
 def delete_user(uid):
-    if session['user']['role'] != 'admin':
-        return redirect(url_for('index'))
+    if uid == session.get('user_id'):
+        flash('본인 계정은 삭제할 수 없습니다.', 'error')
+        return redirect(url_for('users'))
     conn = get_db()
     conn.execute("DELETE FROM users WHERE id=?", (uid,))
-    conn.commit(); conn.close()
-    flash('삭제 완료')
-    return redirect(url_for('manage_users'))
+    conn.commit()
+    conn.close()
+    flash('삭제되었습니다.', 'success')
+    return redirect(url_for('users'))
 
-init_db()
+@app.route('/doc_numbers')
+@login_required
+def doc_numbers():
+    conn = get_db()
+    docs = conn.execute('SELECT d.*, u.name as creator_name, COUNT(o.id) as order_count FROM doc_numbers d LEFT JOIN users u ON d.created_by = u.id LEFT JOIN orders o ON o.doc_no_id = d.id GROUP BY d.id ORDER BY d.created_at DESC').fetchall()
+    conn.close()
+    return render_template('doc_numbers.html', docs=docs)
+
+@app.route('/doc_numbers/add', methods=['POST'])
+@login_required
+def add_doc_number():
+    doc_no = request.form.get('doc_no','').strip()
+    description = request.form.get('description','').strip()
+    if not doc_no:
+        flash('문서번호를 입력하세요.', 'error')
+        return redirect(url_for('doc_numbers'))
+    conn = get_db()
+    if conn.execute("SELECT id FROM doc_numbers WHERE doc_no=?", (doc_no,)).fetchone():
+        flash('이미 존재하는 문서번호입니다.', 'error')
+        conn.close()
+        return redirect(url_for('doc_numbers'))
+    conn.execute("INSERT INTO doc_numbers (doc_no, description, created_by) VALUES (?,?,?)", (doc_no, description, session['user_id']))
+    conn.commit()
+    conn.close()
+    flash(f'문서번호 [{doc_no}]가 등록되었습니다.', 'success')
+    return redirect(url_for('doc_numbers'))
+
+@app.route('/doc_numbers/delete/<int:did>', methods=['POST'])
+@admin_required
+def delete_doc_number(did):
+    conn = get_db()
+    conn.execute("DELETE FROM doc_numbers WHERE id=?", (did,))
+    conn.commit()
+    conn.close()
+    flash('삭제되었습니다.', 'success')
+    return redirect(url_for('doc_numbers'))
+
+@app.route('/orders/new')
+@login_required
+def new_order():
+    conn = get_db()
+    doc_numbers = conn.execute("SELECT * FROM doc_numbers ORDER BY doc_no").fetchall()
+    conn.close()
+    return render_template('order_form.html', order=None, items=[], doc_numbers=doc_numbers, today=date.today().strftime('%Y-%m-%d'), mode='new')
+
+@app.route('/orders/save', methods=['POST'])
+@login_required
+def save_order():
+    order_id = request.form.get('order_id')
+    doc_no_id = request.form.get('doc_no_id') or None
+    order_no = request.form.get('order_no','').strip()
+    title = request.form.get('title','').strip()
+    writer = request.form.get('writer', session['name']).strip()
+    write_date = request.form.get('write_date','').strip()
+    approver1 = request.form.get('approver1','').strip()
+    approver2 = request.form.get('approver2','').strip()
+    approver3 = request.form.get('approver3','').strip()
+    customers = request.form.getlist('customer[]')
+    product_names = request.form.getlist('product_name[]')
+    quantities = request.form.getlist('quantity[]')
+    units = request.form.getlist('unit[]')
+    material_specs = request.form.getlist('material_spec[]')
+    delivery_dates = request.form.getlist('delivery_date[]')
+    notes = request.form.getlist('note[]')
+    conn = get_db()
+    if order_id:
+        conn.execute('UPDATE orders SET doc_no_id=?,order_no=?,title=?,writer=?,write_date=?,approver1=?,approver2=?,approver3=? WHERE id=?', (doc_no_id, order_no, title, writer, write_date, approver1, approver2, approver3, order_id))
+        conn.execute("DELETE FROM order_items WHERE order_id=?", (order_id,))
+    else:
+        cur = conn.execute('INSERT INTO orders (doc_no_id,order_no,title,writer,write_date,approver1,approver2,approver3,created_by) VALUES (?,?,?,?,?,?,?,?,?)', (doc_no_id, order_no, title, writer, write_date, approver1, approver2, approver3, session['user_id']))
+        order_id = cur.lastrowid
+    for i, pname in enumerate(product_names):
+        if pname.strip():
+            conn.execute('INSERT INTO order_items (order_id,seq,customer,product_name,quantity,unit,material_spec,delivery_date,note) VALUES (?,?,?,?,?,?,?,?,?)', (order_id, i+1, customers[i] if i<len(customers) else '', pname.strip(), quantities[i] if i<len(quantities) else '', units[i] if i<len(units) else '', material_specs[i] if i<len(material_specs) else '', delivery_dates[i] if i<len(delivery_dates) else '', notes[i] if i<len(notes) else ''))
+    conn.commit()
+    conn.close()
+    flash('저장되었습니다.', 'success')
+    return redirect(url_for('view_order', oid=order_id))
+
+@app.route('/orders/<int:oid>')
+@login_required
+def view_order(oid):
+    conn = get_db()
+    order = conn.execute('SELECT o.*, d.doc_no FROM orders o LEFT JOIN doc_numbers d ON o.doc_no_id = d.id WHERE o.id=?', (oid,)).fetchone()
+    items = conn.execute("SELECT * FROM order_items WHERE order_id=? ORDER BY seq", (oid,)).fetchall()
+    conn.close()
+    if not order:
+        flash('없는 의뢰서입니다.', 'error')
+        return redirect(url_for('index'))
+    return render_template('order_view.html', order=order, items=items)
+
+@app.route('/orders/<int:oid>/edit')
+@login_required
+def edit_order(oid):
+    conn = get_db()
+    order = conn.execute('SELECT o.*, d.doc_no FROM orders o LEFT JOIN doc_numbers d ON o.doc_no_id = d.id WHERE o.id=?', (oid,)).fetchone()
+    items = conn.execute("SELECT * FROM order_items WHERE order_id=? ORDER BY seq", (oid,)).fetchall()
+    doc_numbers = conn.execute("SELECT * FROM doc_numbers ORDER BY doc_no").fetchall()
+    conn.close()
+    if not order:
+        return redirect(url_for('index'))
+    return render_template('order_form.html', order=order, items=items, doc_numbers=doc_numbers, today=date.today().strftime('%Y-%m-%d'), mode='edit')
+
+@app.route('/orders/<int:oid>/delete', methods=['POST'])
+@login_required
+def delete_order(oid):
+    conn = get_db()
+    conn.execute("DELETE FROM orders WHERE id=?", (oid,))
+    conn.commit()
+    conn.close()
+    flash('삭제되었습니다.', 'success')
+    return redirect(url_for('index'))
+
+@app.route('/orders/<int:oid>/print')
+@login_required
+def print_order(oid):
+    conn = get_db()
+    order = conn.execute('SELECT o.*, d.doc_no FROM orders o LEFT JOIN doc_numbers d ON o.doc_no_id = d.id WHERE o.id=?', (oid,)).fetchone()
+    items = conn.execute("SELECT * FROM order_items WHERE order_id=? ORDER BY seq", (oid,)).fetchall()
+    conn.close()
+    if not order:
+        return redirect(url_for('index'))
+    return render_template('order_print.html', order=order, items=items)
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000, debug=False)
+    init_db()
+    app.run(debug=True)
+
+with app.app_context():
+    init_db()

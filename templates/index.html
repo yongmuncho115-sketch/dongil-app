@@ -1,0 +1,60 @@
+{% extends 'base.html' %}
+{% block content %}
+<h5 class="mb-3">📊 대시보드</h5>
+<div class="row g-3 mb-4">
+  <div class="col-6 col-md-3">
+    <div class="card text-center border-primary">
+      <div class="card-body">
+        <div class="fs-2 fw-bold text-primary">{{ total }}</div>
+        <div class="text-muted small">전체</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card text-center border-warning">
+      <div class="card-body">
+        <div class="fs-2 fw-bold text-warning">{{ pending }}</div>
+        <div class="text-muted small">미출고</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card text-center border-success">
+      <div class="card-body">
+        <div class="fs-2 fw-bold text-success">{{ done }}</div>
+        <div class="text-muted small">출고완료</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card text-center border-danger">
+      <div class="card-body">
+        <div class="fs-2 fw-bold text-danger">{{ urgent }}</div>
+        <div class="text-muted small">납기초과</div>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="d-flex justify-content-between align-items-center mb-2">
+  <h6 class="mb-0">최근 등록</h6>
+  <a href="/orders/new" class="btn btn-primary btn-sm">+ 신규 등록</a>
+</div>
+<div class="table-responsive">
+<table class="table table-sm table-hover bg-white">
+  <thead class="table-dark"><tr>
+    <th>문서번호</th><th>거래처</th><th>상품명</th><th>납기</th><th>상태</th>
+  </tr></thead>
+  <tbody>
+  {% for r in recent %}
+  <tr>
+    <td><a href="/orders/{{ r.id }}/edit">{{ r.문서번호 }}</a></td>
+    <td>{{ r.거래처 }}</td>
+    <td>{{ r.상품명 }}</td>
+    <td>{{ r.납기 }}</td>
+    <td>{% if r.출고여부 %}<span class="badge bg-success">출고</span>{% else %}<span class="badge bg-warning text-dark">대기</span>{% endif %}</td>
+  </tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+{% endblock %}

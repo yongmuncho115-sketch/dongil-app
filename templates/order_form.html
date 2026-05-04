@@ -1,0 +1,59 @@
+{% extends 'base.html' %}
+{% block content %}
+<h5>✏️ 제조의뢰서 수정 — {{ doc_no }}</h5>
+<form method="post">
+<div class="card mb-3"><div class="card-body">
+  <div class="row g-2">
+    <div class="col-md-3">
+      <label class="form-label small">문서번호</label>
+      <input type="text" name="문서번호" class="form-control form-control-sm" value="{{ doc_no }}" readonly>
+    </div>
+    <div class="col-md-3">
+      <label class="form-label small">거래처</label>
+      <select name="거래처" class="form-select form-select-sm">
+        <option value="">-- 선택 --</option>
+        {% for c in 거래처목록 %}<option {% if order.거래처==c %}selected{% endif %}>{{ c }}</option>{% endfor %}
+      </select>
+    </div>
+    <div class="col-md-2">
+      <label class="form-label small">납기</label>
+      <input type="date" name="납기" class="form-control form-control-sm" value="{{ order.납기 or '' }}">
+    </div>
+    <div class="col-md-2">
+      <label class="form-label small">영업담당</label>
+      <select name="영업담당" class="form-select form-select-sm">
+        <option value="">-- 선택 --</option>
+        {% for s in 영업담당목록 %}<option {% if order.영업담당==s %}selected{% endif %}>{{ s }}</option>{% endfor %}
+      </select>
+    </div>
+    <div class="col-md-2">
+      <label class="form-label small">출고여부</label>
+      <div class="form-check mt-1">
+        <input type="checkbox" name="출고여부" class="form-check-input" {% if order.출고여부 %}checked{% endif %}>
+        <label class="form-check-label small">출고완료</label>
+      </div>
+    </div>
+  </div>
+</div></div>
+
+<div class="card mb-3"><div class="card-body">
+<div class="row g-2">
+  {% for field, label in [('상품명','상품명'),('수량','수량'),('단위','단위'),('재질1','재질1'),('두께1','두께1'),('폭1','폭1'),('재질2','재질2'),('두께2','두께2'),('폭2','폭2'),('상품폭','상품폭'),('비중','비중'),('길이','길이'),('피치','피치'),('Cut수','Cut수'),('방향','방향'),('인쇄도수','인쇄도수'),('PE투입','PE투입'),('동판둘레','동판둘레'),('동판폭','동판폭'),('포장방법','포장방법'),('폼텍갯수','폼텍갯수'),('일매','일매'),('적요','적요'),('후도','후도'),('캡','캡'),('밑지','밑지'),('이차여부','이차여부'),('이차가공','이차가공'),('실링','실링'),('개구부','개구부'),('방향2','방향2')] %}
+  <div class="col-6 col-md-2">
+    <label class="form-label small">{{ label }}</label>
+    <input type="text" name="{{ field }}" class="form-control form-control-sm" value="{{ order[field] or '' }}">
+  </div>
+  {% endfor %}
+  <div class="col-md-4">
+    <label class="form-label small">비고</label>
+    <input type="text" name="비고" class="form-control form-control-sm" value="{{ order.비고 or '' }}">
+  </div>
+</div>
+</div></div>
+
+<div class="d-flex gap-2">
+  <button type="submit" class="btn btn-primary">저장</button>
+  <a href="/orders" class="btn btn-secondary">취소</a>
+</div>
+</form>
+{% endblock %}

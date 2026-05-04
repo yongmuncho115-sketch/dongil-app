@@ -1,0 +1,25 @@
+{% extends 'base.html' %}
+{% block content %}
+<h5>{{ title }}</h5>
+<form method="post" class="row g-2 mb-3">
+  <div class="col-auto">
+    <input type="text" name="name" class="form-control form-control-sm" placeholder="추가할 이름" required>
+  </div>
+  <div class="col-auto"><button class="btn btn-primary btn-sm">추가</button></div>
+</form>
+<table class="table table-sm table-hover bg-white" style="max-width:400px">
+  <thead class="table-dark"><tr><th>{{ col }}</th><th>삭제</th></tr></thead>
+  <tbody>
+  {% for r in rows %}
+  <tr>
+    <td>{{ r[col] }}</td>
+    <td>
+      <form method="post" action="/{{ endpoint.replace('master_','master/').replace('_','/') }}/{{ r.id }}/delete" class="d-inline">
+        <button class="btn btn-outline-danger btn-sm py-0">삭제</button>
+      </form>
+    </td>
+  </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

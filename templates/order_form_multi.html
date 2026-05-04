@@ -1,0 +1,79 @@
+{% extends 'base.html' %}
+{% block content %}
+<h5>📝 제조의뢰서 신규 등록</h5>
+<form method="post" id="mainForm">
+<div class="card mb-3"><div class="card-body">
+  <div class="row g-2">
+    <div class="col-md-3">
+      <label class="form-label small">문서번호</label>
+      <input type="text" name="문서번호" class="form-control form-control-sm" value="{{ doc_no }}">
+    </div>
+    <div class="col-md-3">
+      <label class="form-label small">거래처</label>
+      <select name="거래처" class="form-select form-select-sm">
+        <option value="">-- 선택 --</option>
+        {% for c in 거래처목록 %}<option>{{ c }}</option>{% endfor %}
+      </select>
+    </div>
+    <div class="col-md-2">
+      <label class="form-label small">납기</label>
+      <input type="date" name="납기" class="form-control form-control-sm">
+    </div>
+    <div class="col-md-2">
+      <label class="form-label small">영업담당</label>
+      <select name="영업담당" class="form-select form-select-sm">
+        <option value="">-- 선택 --</option>
+        {% for s in 영업담당목록 %}<option>{{ s }}</option>{% endfor %}
+      </select>
+    </div>
+    <div class="col-md-2">
+      <label class="form-label small">비고</label>
+      <input type="text" name="비고" class="form-control form-control-sm">
+    </div>
+  </div>
+</div></div>
+
+<div class="card mb-3"><div class="card-body">
+  <div class="d-flex justify-content-between mb-2">
+    <strong>상품 행 목록</strong>
+    <button type="button" class="btn btn-sm btn-outline-primary" onclick="addRow()">+ 행 추가</button>
+  </div>
+  <div class="table-responsive">
+  <table class="table table-sm table-bordered" id="rowTable">
+    <thead class="table-secondary"><tr>
+      <th>상품명</th><th>수량</th><th>단위</th><th>재질1</th><th>두께1</th><th>폭1</th>
+      <th>재질2</th><th>두께2</th><th>폭2</th><th>상품폭</th><th>비중</th><th>길이</th>
+      <th>피치</th><th>Cut수</th><th>방향</th><th>인쇄도수</th><th>PE투입</th>
+      <th>동판둘레</th><th>동판폭</th><th>포장방법</th><th>폼텍갯수</th>
+      <th>일매</th><th>적요</th><th>후도</th><th>캡</th><th>밑지</th>
+      <th>이차여부</th><th>이차가공</th><th>실링</th><th>개구부</th><th>방향2</th>
+      <th>상품등록번호</th><th>삭제</th>
+    </tr></thead>
+    <tbody id="rowBody"></tbody>
+  </table>
+  </div>
+</div></div>
+
+<div class="d-flex gap-2">
+  <button type="submit" class="btn btn-primary">등록</button>
+  <a href="/orders" class="btn btn-secondary">취소</a>
+</div>
+</form>
+
+<script>
+const fields = ['상품명','수량','단위','재질1','두께1','폭1','재질2','두께2','폭2',
+  '상품폭','비중','길이','피치','Cut수','방향','인쇄도수','PE투입',
+  '동판둘레','동판폭','포장방법','폼텍갯수','일매','적요','후도','캡','밑지',
+  '이차여부','이차가공','실링','개구부','방향2','상품등록번호'];
+
+function addRow() {
+  const tbody = document.getElementById('rowBody');
+  const tr = document.createElement('tr');
+  let cells = fields.map(f => `<td><input type="text" name="${f}[]" class="form-control form-control-sm" style="min-width:70px"></td>`).join('');
+  cells += `<td><button type="button" class="btn btn-sm btn-outline-danger" onclick="this.closest('tr').remove()">×</button></td>`;
+  tr.innerHTML = cells;
+  tbody.appendChild(tr);
+}
+addRow();
+</script>
+{% endblock %}

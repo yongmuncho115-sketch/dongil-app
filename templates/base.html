@@ -2,45 +2,65 @@
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>동일산업 제조의뢰서</title>
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/css/bootstrap.min.css">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{% block title %}동일산업 제조의뢰서{% endblock %}</title>
 <style>
-body{background:#f8f9fa;}
-.navbar{background:#1a3a5c!important;}
-.navbar-brand,.nav-link{color:#fff!important;}
-.nav-link:hover{color:#ffc107!important;}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'Malgun Gothic', sans-serif; background: #f0f2f5; color: #333; }
+nav { background: #1a3a6b; color: #fff; padding: 0 24px; display: flex; align-items: center; justify-content: space-between; height: 56px; box-shadow: 0 2px 8px rgba(0,0,0,0.2); }
+nav .brand { font-size: 18px; font-weight: 700; }
+nav .nav-links { display: flex; gap: 8px; align-items: center; }
+nav a { color: #cfd8f0; text-decoration: none; padding: 6px 12px; border-radius: 4px; font-size: 14px; }
+nav a:hover { background: rgba(255,255,255,0.15); color: #fff; }
+nav .btn-logout { background: #c0392b; color: #fff; padding: 6px 14px; border-radius: 4px; }
+.user-info { font-size: 13px; color: #aec6ef; margin-right: 8px; }
+.container { max-width: 1200px; margin: 24px auto; padding: 0 16px; }
+.card { background: #fff; border-radius: 8px; box-shadow: 0 1px 6px rgba(0,0,0,0.1); padding: 24px; margin-bottom: 20px; }
+.page-title { font-size: 22px; font-weight: 700; color: #1a3a6b; margin-bottom: 20px; }
+.btn { display: inline-block; padding: 8px 18px; border-radius: 5px; font-size: 14px; border: none; cursor: pointer; text-decoration: none; font-weight: 600; }
+.btn-primary { background: #1a3a6b; color: #fff; }
+.btn-success { background: #27ae60; color: #fff; }
+.btn-warning { background: #e67e22; color: #fff; }
+.btn-danger { background: #c0392b; color: #fff; }
+.btn-info { background: #2980b9; color: #fff; }
+.btn-secondary { background: #7f8c8d; color: #fff; }
+.btn-print { background: #8e44ad; color: #fff; }
+.btn-sm { padding: 5px 12px; font-size: 12px; }
+.btn-group { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; }
+.flash-messages { margin-bottom: 16px; }
+.flash { padding: 10px 16px; border-radius: 5px; margin-bottom: 8px; font-size: 14px; }
+.flash.success { background: #d5f5e3; color: #1e8449; border-left: 4px solid #27ae60; }
+.flash.error { background: #fadbd8; color: #922b21; border-left: 4px solid #c0392b; }
+table { width: 100%; border-collapse: collapse; font-size: 14px; }
+table th { background: #1a3a6b; color: #fff; padding: 10px 12px; text-align: center; }
+table td { padding: 9px 12px; border-bottom: 1px solid #eee; text-align: center; vertical-align: middle; }
+table tr:hover { background: #f8f9fa; }
+.badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 12px; font-weight: 600; }
+.badge-admin { background: #f0e6ff; color: #6c3483; }
+.badge-user { background: #e8f4f8; color: #1a5276; }
+.badge-active { background: #d5f5e3; color: #1e8449; }
+.badge-inactive { background: #fadbd8; color: #922b21; }
 </style>
+{% block extra_head %}{% endblock %}
 </head>
 <body>
-<nav class="navbar navbar-expand-lg">
-  <div class="container-fluid">
-    <a class="navbar-brand fw-bold" href="/">🏭 동일산업</a>
-    <div class="collapse navbar-collapse">
-      <ul class="navbar-nav me-auto">
-        <li class="nav-item"><a class="nav-link" href="/">대시보드</a></li>
-        <li class="nav-item"><a class="nav-link" href="/orders">제조의뢰서</a></li>
-        <li class="nav-item"><a class="nav-link" href="/master/clients">거래처관리</a></li>
-        <li class="nav-item"><a class="nav-link" href="/master/staff">영업담당</a></li>
-        {% if session.user and session.user.role=='admin' %}
-        <li class="nav-item"><a class="nav-link" href="/users">사용자관리</a></li>
-        {% endif %}
-      </ul>
-      <span class="navbar-text text-white me-3">{{ session.user.name }}님</span>
-      <a class="btn btn-outline-light btn-sm" href="/logout">로그아웃</a>
-    </div>
+<nav>
+  <div class="brand">🏭 동일산업 제조의뢰서</div>
+  {% if session.user_id %}
+  <div class="nav-links">
+    <span class="user-info">{{ session.name }} ({{ session.role }})</span>
+    <a href="{{ url_for('index') }}">📋 발주목록</a>
+    <a href="{{ url_for('doc_numbers') }}">🔢 문서번호</a>
+    {% if session.role == 'admin' %}<a href="{{ url_for('users') }}">👥 사용자관리</a>{% endif %}
+    <a href="{{ url_for('logout') }}" class="btn-logout">로그아웃</a>
   </div>
+  {% endif %}
 </nav>
-<div class="container-fluid py-3">
-{% with messages = get_flashed_messages() %}
-{% if messages %}
-<div class="alert alert-success alert-dismissible fade show">
-{{ messages[0] }}<button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+<div class="container">
+  {% with messages = get_flashed_messages(with_categories=true) %}
+  {% if messages %}<div class="flash-messages">{% for cat, msg in messages %}<div class="flash {{ cat }}">{{ msg }}</div>{% endfor %}</div>{% endif %}
+  {% endwith %}
+  {% block content %}{% endblock %}
 </div>
-{% endif %}
-{% endwith %}
-{% block content %}{% endblock %}
-</div>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>
